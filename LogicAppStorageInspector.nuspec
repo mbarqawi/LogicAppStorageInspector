@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package>
+  <metadata>
+    <id>LogicAppStorageInspector</id>
+    <version>1.0.0</version>
+    <title>Logic App Storage Inspector</title>
+    <authors>LogicAppStorageInspector Contributors</authors>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <description>Kudu site extension for inspecting Azure Logic Apps Standard workflow history, versions, tables, and queues.</description>
+    <tags>AzureSiteExtension Azure LogicApps Kudu Storage Diagnostics</tags>
+    <packageTypes>
+      <packageType name="AzureSiteExtension" />
+    </packageTypes>
+  </metadata>
+  <files>
+    <file src="publish\**\*" target="content" />
+  </files>
+</package>
