@@ -12,7 +12,7 @@ namespace LogicAppStorageInspector.Services
     public sealed class HistorySearchService
     {
         private static readonly Regex DatedActions = new(@"(\d{8})t000000zactions$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
-        private static readonly string[] Cols = { "ActionName", "Status", "FlowName", "FlowRunSequenceId", "CreatedTime", "InputsLinkCompressed", "OutputsLinkCompressed" };
+        private static readonly string[] Cols = { "ActionName", "TriggerName", "HistoryName", "Status", "FlowName", "FlowRunSequenceId", "CreatedTime", "InputsLinkCompressed", "OutputsLinkCompressed" };
 
         private readonly StorageContext _storage;
         private readonly SiteScope _scope;
@@ -23,7 +23,7 @@ namespace LogicAppStorageInspector.Services
         {
             await _scope.EnsureAsync(ct).ConfigureAwait(false);
             var flows = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
-            await foreach (var tbl in ListActionTablesAsync(null, null, ct).ConfigureAwait(false))
+            await foreach (var tbl in ListContentTablesAsync(null, null, ct).ConfigureAwait(false))
             {
                 var tc = _storage.Tables.GetTableClient(tbl);
                 await foreach (var e in tc.QueryAsync<TableEntity>(select: new[] { "FlowName" }, cancellationToken: ct).ConfigureAwait(false))
@@ -50,9 +50,10 @@ namespace LogicAppStorageInspector.Services
             int scanned = 0;
             var filter = BuildTimeFilter(req.From, req.To);
 
-            await foreach (var tbl in ListActionTablesAsync(req.From, req.To, ct).ConfigureAwait(false))
+            await foreach (var tbl in ListContentTablesAsync(req.From, req.To, ct).ConfigureAwait(false))
             {
                 if (results.Count >= need) break;
+                var isTrigger = tbl.EndsWith("histories", StringComparison.OrdinalIgnoreCase);
                 var tc = _storage.Tables.GetTableClient(tbl);
                 await foreach (var e in tc.QueryAsync<TableEntity>(filter: filter, select: Cols, cancellationToken: ct).ConfigureAwait(false))
                 {
@@ -63,21 +64,27 @@ namespace LogicAppStorageInspector.Services
                     scanned++;
                     var created = ScanEngine.AsText(e, "CreatedTime");
                     var runId = e.GetString("FlowRunSequenceId") ?? "";
-                    var action = e.GetString("ActionName") ?? "";
+                    var name = e.GetString("ActionName");
+                    if (string.IsNullOrEmpty(name)) name = e.GetString("TriggerName");
+                    if (string.IsNullOrEmpty(name)) name = e.GetString("HistoryName");
+                    name ??= "";
+                    var inKind = isTrigger ? "trigger-input" : "input";
+                    var outKind = isTrigger ? "trigger-output" : "output";
 
                     var inputs = ScanEngine.DecodeField(e.ContainsKey("InputsLinkCompressed") ? e.GetBinary("InputsLinkCompressed") : null, _storage.Blobs);
                     var outputs = ScanEngine.DecodeField(e.ContainsKey("OutputsLinkCompressed") ? e.GetBinary("OutputsLinkCompressed") : null, _storage.Blobs);
 
                     if (string.IsNullOrEmpty(query))
                     {
-                        if (!string.IsNullOrEmpty(inputs)) results.Add(new HistoryRow(flow, runId, action, created, inputs, "input"));
+                        if (!string.IsNullOrEmpty(inputs)) results.Add(new HistoryRow(flow, runId, name, created, inputs, inKind));
+                        else if (!string.IsNullOrEmpty(outputs)) results.Add(new HistoryRow(flow, runId, name, created, outputs, outKind));
                     }
                     else
                     {
                         if (!string.IsNullOrEmpty(inputs) && inputs.Contains(query, StringComparison.OrdinalIgnoreCase))
-                            results.Add(new HistoryRow(flow, runId, action, created, inputs, "input"));
+                            results.Add(new HistoryRow(flow, runId, name, created, inputs, inKind));
                         if (!string.IsNullOrEmpty(outputs) && outputs.Contains(query, StringComparison.OrdinalIgnoreCase))
-                            results.Add(new HistoryRow(flow, runId, action, created, outputs, "output"));
+                            results.Add(new HistoryRow(flow, runId, name, created, outputs, outKind));
                     }
                     if (results.Count >= need) break;
                 }
@@ -88,13 +95,20 @@ namespace LogicAppStorageInspector.Services
             return new HistorySearchResponse(pageItems, page, pageSize, hasMore, scanned, results.Count);
         }
 
-        private async IAsyncEnumerable<string> ListActionTablesAsync(DateTimeOffset? from, DateTimeOffset? to, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
+        // Action tables are dated and filtered by day; history (trigger) tables are undated.
+        private async IAsyncEnumerable<string> ListContentTablesAsync(DateTimeOffset? from, DateTimeOffset? to, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
         {
             var prefix = _scope.Prefix;
             await foreach (var t in _storage.Tables.QueryAsync(cancellationToken: ct).ConfigureAwait(false))
             {
                 var name = t.Name;
                 if (!name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) continue;
+
+                if (name.EndsWith("histories", StringComparison.OrdinalIgnoreCase))
+                {
+                    yield return name;
+                    continue;
+                }
                 if (!name.EndsWith("actions", StringComparison.OrdinalIgnoreCase)) continue;
 
                 var m = DatedActions.Match(name);
