@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="600" viewBox="0 0 1200 600" role="img" aria-labelledby="title desc">
+  <title id="title">Logic App Storage Inspector overview screenshot placeholder</title>
+  <desc id="desc">Replace this placeholder with a screenshot of the application overview.</desc>
+  <rect width="1200" height="600" fill="#111827"/>
+  <rect x="48" y="48" width="1104" height="504" rx="18" fill="#1f2937" stroke="#60a5fa" stroke-width="3" stroke-dasharray="12 10"/>
+  <text x="600" y="280" fill="#f9fafb" font-family="Segoe UI, sans-serif" font-size="38" text-anchor="middle">Application Overview</text>
+  <text x="600" y="335" fill="#9ca3af" font-family="Segoe UI, sans-serif" font-size="24" text-anchor="middle">Replace with a Logic App Storage Inspector screenshot</text>
+</svg>

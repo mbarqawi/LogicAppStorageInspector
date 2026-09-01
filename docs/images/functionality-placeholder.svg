@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="600" viewBox="0 0 1200 600" role="img" aria-labelledby="title desc">
+  <title id="title">Functionality screenshot placeholder</title>
+  <desc id="desc">Replace this placeholder with screenshots of history search, versions, and dashboard pages.</desc>
+  <rect width="1200" height="600" fill="#111827"/>
+  <g fill="#1f2937" stroke="#34d399" stroke-width="3" stroke-dasharray="12 10">
+    <rect x="48" y="70" width="336" height="460" rx="18"/>
+    <rect x="432" y="70" width="336" height="460" rx="18"/>
+    <rect x="816" y="70" width="336" height="460" rx="18"/>
+  </g>
+  <g fill="#f9fafb" font-family="Segoe UI, sans-serif" font-size="27" text-anchor="middle">
+    <text x="216" y="285">History Search</text>
+    <text x="600" y="285">Flow Versions</text>
+    <text x="984" y="285">Dashboard</text>
+  </g>
+  <text x="600" y="345" fill="#9ca3af" font-family="Segoe UI, sans-serif" font-size="21" text-anchor="middle">Replace each panel with a feature screenshot</text>
+</svg>

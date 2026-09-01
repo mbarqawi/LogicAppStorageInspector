@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="600" viewBox="0 0 1200 600" role="img" aria-labelledby="title desc">
+  <title id="title">Install Kudu extension screenshot placeholder</title>
+  <desc id="desc">Replace this placeholder with a Kudu screenshot showing the Site Extensions Gallery and install action.</desc>
+  <rect width="1200" height="600" fill="#f3f4f6"/>
+  <rect x="48" y="48" width="1104" height="504" rx="18" fill="#ffffff" stroke="#7c3aed" stroke-width="3" stroke-dasharray="12 10"/>
+  <text x="600" y="275" fill="#111827" font-family="Segoe UI, sans-serif" font-size="38" text-anchor="middle">Kudu Step 2: Site Extensions Gallery</text>
+  <text x="600" y="330" fill="#6b7280" font-family="Segoe UI, sans-serif" font-size="24" text-anchor="middle">Replace with screenshot: search, select +, and confirm installation</text>
+</svg>
