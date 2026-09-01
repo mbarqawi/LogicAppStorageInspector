@@ -7,7 +7,7 @@
     <RootNamespace>LogicAppStorageInspector</RootNamespace>
     <InvariantGlobalization>true</InvariantGlobalization>
     <AspNetCoreHostingModel>OutOfProcess</AspNetCoreHostingModel>
-    <DefaultItemExcludes>$(DefaultItemExcludes);publish\**;web\**;package-lock.json</DefaultItemExcludes>
+    <DefaultItemExcludes>$(DefaultItemExcludes);publish\**;artifacts\**;web\**;package-lock.json</DefaultItemExcludes>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Azure.Data.Tables" Version="12.9.1" />

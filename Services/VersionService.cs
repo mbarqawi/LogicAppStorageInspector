@@ -10,6 +10,8 @@ namespace LogicAppStorageInspector.Services
     // Reads each per-workflow <sitePrefix><flowHash>flows table.
     public sealed class VersionService
     {
+        private const string VersionRowMarker = "_FLOWVERSION-";
+
         private readonly StorageContext _storage;
         private readonly SiteScope _scope;
 
@@ -18,46 +20,71 @@ namespace LogicAppStorageInspector.Services
         public async Task<List<FlowVersionNode>> GetTreeAsync(CancellationToken ct)
         {
             await _scope.EnsureAsync(ct).ConfigureAwait(false);
-            // Real identity is the FlowId column; the table-name hash segment is not the flow id.
-            var byId = new Dictionary<string, FlowAccumulator>(StringComparer.OrdinalIgnoreCase);
-
+            var rows = new List<TableEntity>();
             await foreach (var tableName in ListFlowsTablesAsync(ct).ConfigureAwait(false))
             {
                 var tc = _storage.Tables.GetTableClient(tableName);
                 await foreach (var e in tc.QueryAsync<TableEntity>(cancellationToken: ct).ConfigureAwait(false))
                 {
                     ct.ThrowIfCancellationRequested();
-                    var flowId = e.GetString("FlowId");
-                    if (string.IsNullOrEmpty(flowId)) continue;
-                    var version = FirstNonEmpty(e, "FlowSequenceId", "FlowVersion", "Version");
-                    if (string.IsNullOrEmpty(version)) continue;
-
-                    var flow = e.GetString("FlowName") ?? "(unknown)";
-                    var created = FirstTime(e, "CreatedTime", "ChangedTime");
-                    var author = FirstNonEmpty(e, "CreatedBy", "Author", "ChangedBy") ?? "";
-
-                    if (!byId.TryGetValue(flowId, out var acc)) { acc = new FlowAccumulator(flow); byId[flowId] = acc; }
-                    if (acc.FlowName == "(unknown)" && flow != "(unknown)") acc.FlowName = flow;
-                    if (!acc.Versions.ContainsKey(version)) acc.Versions[version] = new VersionInfo(version, created, author);
+                    rows.Add(e);
                 }
             }
 
-            return byId
-                .OrderBy(kv => kv.Value.FlowName, StringComparer.OrdinalIgnoreCase)
-                .ThenBy(kv => kv.Key, StringComparer.OrdinalIgnoreCase)
-                .Select(kv => new FlowVersionNode(
-                    kv.Value.FlowName,
-                    kv.Key,
-                    kv.Value.Versions.Values
-                        .OrderByDescending(v => v.VersionId, StringComparer.Ordinal).ToArray()))
+            var nodes = new List<FlowVersionNode>();
+            foreach (var grp in rows
+                .Where(e => !string.IsNullOrEmpty(e.GetString("FlowId")))
+                .GroupBy(e => e.GetString("FlowId"), StringComparer.OrdinalIgnoreCase))
+            {
+                var flowId = grp.Key;
+                var name = grp.Select(e => e.GetString("FlowName")).FirstOrDefault(n => !string.IsNullOrEmpty(n)) ?? "(unknown)";
+
+                // Created date is the flow's creation, taken from its lookup/identifier row.
+                var flowRow = PickFlowRow(grp);
+                var created = flowRow != null ? FirstTime(flowRow, "CreatedTime", "ChangedTime") : "";
+                var author = flowRow != null ? (FirstNonEmpty(flowRow, "CreatedBy", "Author", "ChangedBy") ?? "") : "";
+
+                var seqs = grp.Where(IsVersionRow)
+                    .Select(e => FirstNonEmpty(e, "FlowSequenceId", "FlowVersion", "Version"))
+                    .Where(v => !string.IsNullOrEmpty(v))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+
+                // Draft-only flows have no version row; surface a single entry so they still appear.
+                if (seqs.Count == 0)
+                {
+                    var s = grp.Select(e => FirstNonEmpty(e, "FlowSequenceId", "FlowVersion", "Version"))
+                        .FirstOrDefault(v => !string.IsNullOrEmpty(v));
+                    if (!string.IsNullOrEmpty(s)) seqs.Add(s);
+                }
+
+                var versions = seqs
+                    .Select(sq => new VersionInfo(sq, created, author))
+                    .OrderBy(v => v.VersionId, StringComparer.Ordinal)
+                    .ToArray();
+
+                nodes.Add(new FlowVersionNode(name, flowId, versions));
+            }
+
+            return nodes
+                .OrderBy(n => n.FlowName, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(n => n.FlowId, StringComparer.OrdinalIgnoreCase)
                 .ToList();
         }
 
-        private sealed class FlowAccumulator
+        private static bool IsVersionRow(TableEntity e) =>
+            (e.RowKey ?? "").IndexOf(VersionRowMarker, StringComparison.OrdinalIgnoreCase) >= 0;
+
+        private static TableEntity PickFlowRow(IEnumerable<TableEntity> grp)
         {
-            public string FlowName;
-            public readonly Dictionary<string, VersionInfo> Versions = new(StringComparer.OrdinalIgnoreCase);
-            public FlowAccumulator(string flowName) { FlowName = flowName; }
+            var list = grp as ICollection<TableEntity> ?? grp.ToList();
+            TableEntity ByMarker(string marker) =>
+                list.FirstOrDefault(e => (e.RowKey ?? "").IndexOf(marker, StringComparison.OrdinalIgnoreCase) >= 0);
+
+            return ByMarker("_FLOWLOOKUP-")
+                ?? ByMarker("_FLOWDRAFTLOOKUP-")
+                ?? ByMarker("_FLOWIDENTIFIER-")
+                ?? list.OrderBy(e => FirstTime(e, "CreatedTime", "ChangedTime"), StringComparer.Ordinal).FirstOrDefault();
         }
 
         public async Task<VersionContent> GetContentAsync(string flowName, string versionId, string flowId, CancellationToken ct)
@@ -67,7 +94,8 @@ namespace LogicAppStorageInspector.Services
                 ? $"FlowSequenceId eq '{Esc(versionId)}' and FlowName eq '{Esc(flowName)}'"
                 : $"FlowSequenceId eq '{Esc(versionId)}' and FlowId eq '{Esc(flowId)}'";
 
-            TableEntity fallback = null;
+            string fallbackContent = null;
+            TableEntity fallbackEntity = null;
             await foreach (var tableName in ListFlowsTablesAsync(ct).ConfigureAwait(false))
             {
                 var tc = _storage.Tables.GetTableClient(tableName);
@@ -77,13 +105,17 @@ namespace LogicAppStorageInspector.Services
                     {
                         var decoded = ScanEngine.DecodeField(def, _storage.Blobs);
                         if (!string.IsNullOrEmpty(decoded))
-                            return new VersionContent(flowName, versionId, ScanEngine.Pretty(decoded));
+                        {
+                            if (IsVersionRow(e)) return new VersionContent(flowName, versionId, ScanEngine.Pretty(decoded));
+                            fallbackContent ??= decoded;
+                        }
                     }
-                    fallback ??= e;
+                    fallbackEntity ??= e;
                 }
             }
-            return fallback != null
-                ? new VersionContent(flowName, versionId, ScanEngine.Pretty(ExtractDefinition(fallback)))
+            if (fallbackContent != null) return new VersionContent(flowName, versionId, ScanEngine.Pretty(fallbackContent));
+            return fallbackEntity != null
+                ? new VersionContent(flowName, versionId, ScanEngine.Pretty(ExtractDefinition(fallbackEntity)))
                 : new VersionContent(flowName, versionId, "(version not found)");
         }
 

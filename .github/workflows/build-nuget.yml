@@ -1,0 +1,151 @@
+name: Build NuGet package
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Package version, for example 1.0.2
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: package-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  package:
+    name: Build Azure Site Extension package
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set package version
+        shell: pwsh
+        run: |
+          $version = '${{ inputs.version }}'
+          if ([string]::IsNullOrWhiteSpace($version)) {
+            $version = "1.0.${{ github.run_number }}"
+          }
+          if ($version -notmatch '^\d+\.\d+\.\d+([-.][0-9A-Za-z.-]+)?$') {
+            throw "Invalid package version: $version"
+          }
+          "PACKAGE_VERSION=$version" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+
+      - name: Set up NuGet
+        uses: NuGet/setup-nuget@v2
+
+      - name: Clean generated output
+        shell: pwsh
+        run: |
+          Remove-Item wwwroot, publish, artifacts/nuget -Recurse -Force -ErrorAction SilentlyContinue
+          New-Item artifacts/nuget -ItemType Directory -Force | Out-Null
+
+      - name: Build frontend
+        shell: pwsh
+        run: |
+          npm ci --prefix web
+          npm run build --prefix web
+
+      - name: Publish self-contained extension
+        shell: pwsh
+        run: |
+          dotnet publish ./LogicAppStorageInspector.csproj `
+            --configuration Release `
+            --runtime win-x64 `
+            --self-contained true `
+            --output ./publish `
+            -p:UseAppHost=true
+
+      - name: Validate publish output
+        shell: pwsh
+        run: |
+          $required = @(
+            'LogicAppStorageInspector.exe',
+            'LogicAppStorageInspector.dll',
+            'LogicAppStorageInspector.deps.json',
+            'LogicAppStorageInspector.runtimeconfig.json',
+            'web.config',
+            'scmApplicationHost.xdt',
+            'wwwroot/index.html'
+          )
+          foreach ($path in $required) {
+            if (-not (Test-Path (Join-Path publish $path))) {
+              throw "Missing publish file: $path"
+            }
+          }
+          if (-not (Get-ChildItem publish/wwwroot/assets -File -ErrorAction SilentlyContinue)) {
+            throw 'No frontend assets were published.'
+          }
+
+      - name: Create NuGet package
+        shell: pwsh
+        run: |
+          nuget pack ./LogicAppStorageInspector.nuspec `
+            -Version $env:PACKAGE_VERSION `
+            -BasePath $PWD `
+            -OutputDirectory ./artifacts/nuget `
+            -NonInteractive
+
+      - name: Validate NuGet package
+        shell: pwsh
+        run: |
+          Add-Type -AssemblyName System.IO.Compression
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $packages = @(Get-ChildItem artifacts/nuget/*.nupkg)
+          if ($packages.Count -ne 1) {
+            throw "Expected one package; found $($packages.Count)."
+          }
+          $zip = [System.IO.Compression.ZipFile]::OpenRead($packages[0].FullName)
+          try {
+            $names = @($zip.Entries.FullName)
+            $required = @(
+              'content/LogicAppStorageInspector.exe',
+              'content/LogicAppStorageInspector.dll',
+              'content/web.config',
+              'content/scmApplicationHost.xdt',
+              'content/wwwroot/index.html'
+            )
+            foreach ($path in $required) {
+              if ($names -notcontains $path) { throw "Missing package entry: $path" }
+            }
+            $nuspecEntry = @($zip.Entries | Where-Object FullName -Like '*.nuspec')
+            if ($nuspecEntry.Count -ne 1) { throw 'Expected one embedded nuspec.' }
+            $reader = [System.IO.StreamReader]::new($nuspecEntry[0].Open())
+            try { [xml]$spec = $reader.ReadToEnd() } finally { $reader.Dispose() }
+            $metadata = $spec.SelectSingleNode("/*[local-name()='package']/*[local-name()='metadata']")
+            $author = $metadata.SelectSingleNode("*[local-name()='authors']").InnerText
+            $packageType = $metadata.SelectSingleNode("*[local-name()='packageTypes']/*[local-name()='packageType']").GetAttribute('name')
+            if ($author -cne 'Mohammed Barqawi') { throw "Unexpected package author: $author" }
+            if ($packageType -ne 'AzureSiteExtension') { throw 'AzureSiteExtension package type is missing.' }
+          }
+          finally {
+            $zip.Dispose()
+          }
+
+      - name: Upload NuGet package
+        uses: actions/upload-artifact@v4
+        with:
+          name: LogicAppStorageInspector-${{ env.PACKAGE_VERSION }}
+          path: artifacts/nuget/*.nupkg
+          if-no-files-found: error
+          retention-days: 30

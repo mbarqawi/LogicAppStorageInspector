@@ -4,7 +4,7 @@
     <id>LogicAppStorageInspector</id>
     <version>1.0.0</version>
     <title>Logic App Storage Inspector</title>
-    <authors>LogicAppStorageInspector Contributors</authors>
+    <authors>Mohammed Barqawi</authors>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
     <description>Kudu site extension for inspecting Azure Logic Apps Standard workflow history, versions, tables, and queues.</description>
     <tags>AzureSiteExtension Azure LogicApps Kudu Storage Diagnostics</tags>
