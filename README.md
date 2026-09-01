@@ -77,7 +77,7 @@ The [Build and release NuGet package workflow](.github/workflows/build-nuget.yml
 
 1. Builds the React frontend.
 2. Publishes a self-contained Windows x64 extension.
-3. Creates and validates the `AzureSiteExtension` NuGet package.
+3. Creates and validates the `AzureSiteExtension` NuGet package, including this package README.
 4. Uploads the `.nupkg` as a workflow artifact.
 5. Creates a GitHub Release with the `.nupkg` when started manually.
 

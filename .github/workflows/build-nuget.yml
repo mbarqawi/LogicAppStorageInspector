@@ -119,6 +119,7 @@ jobs:
           try {
             $names = @($zip.Entries.FullName)
             $required = @(
+              'README.md',
               'content/LogicAppStorageInspector.exe',
               'content/LogicAppStorageInspector.dll',
               'content/web.config',
@@ -134,8 +135,10 @@ jobs:
             try { [xml]$spec = $reader.ReadToEnd() } finally { $reader.Dispose() }
             $metadata = $spec.SelectSingleNode("/*[local-name()='package']/*[local-name()='metadata']")
             $author = $metadata.SelectSingleNode("*[local-name()='authors']").InnerText
+            $readme = $metadata.SelectSingleNode("*[local-name()='readme']").InnerText
             $packageType = $metadata.SelectSingleNode("*[local-name()='packageTypes']/*[local-name()='packageType']").GetAttribute('name')
             if ($author -cne 'Mohammed Barqawi') { throw "Unexpected package author: $author" }
+            if ($readme -cne 'README.md') { throw "Unexpected package README: $readme" }
             if ($packageType -ne 'AzureSiteExtension') { throw 'AzureSiteExtension package type is missing.' }
           }
           finally {

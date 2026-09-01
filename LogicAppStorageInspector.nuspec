@@ -8,11 +8,13 @@
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
     <description>Kudu site extension for inspecting Azure Logic Apps Standard workflow history, versions, tables, and queues.</description>
     <tags>AzureSiteExtension Azure LogicApps Kudu Storage Diagnostics</tags>
+    <readme>README.md</readme>
     <packageTypes>
       <packageType name="AzureSiteExtension" />
     </packageTypes>
   </metadata>
   <files>
+    <file src="README.md" target="" />
     <file src="publish\**\*" target="content" />
   </files>
 </package>
