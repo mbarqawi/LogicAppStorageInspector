@@ -57,7 +57,7 @@ jobs:
       - name: Clean generated output
         shell: pwsh
         run: |
-          Remove-Item wwwroot, publish, artifacts/nuget -Recurse -Force -ErrorAction SilentlyContinue
+          Remove-Item wwwroot, publish, bin, obj, artifacts/nuget -Recurse -Force -ErrorAction SilentlyContinue
           New-Item artifacts/nuget -ItemType Directory -Force | Out-Null
 
       - name: Build frontend
@@ -75,6 +75,12 @@ jobs:
             --self-contained true `
             --output ./publish `
             -p:UseAppHost=true
+
+      - name: Stage fresh frontend
+        shell: pwsh
+        run: |
+          Remove-Item ./publish/wwwroot -Recurse -Force -ErrorAction SilentlyContinue
+          Copy-Item ./wwwroot ./publish/wwwroot -Recurse -Force
 
       - name: Validate publish output
         shell: pwsh
@@ -95,6 +101,25 @@ jobs:
           }
           if (-not (Get-ChildItem publish/wwwroot/assets -File -ErrorAction SilentlyContinue)) {
             throw 'No frontend assets were published.'
+          }
+          $sourceRoot = (Resolve-Path wwwroot).Path
+          $publishedRoot = (Resolve-Path publish/wwwroot).Path
+          $sourceFiles = @(Get-ChildItem $sourceRoot -File -Recurse)
+          $publishedFiles = @(Get-ChildItem $publishedRoot -File -Recurse)
+          if ($sourceFiles.Count -ne $publishedFiles.Count) {
+            throw "Frontend file count differs: source=$($sourceFiles.Count), publish=$($publishedFiles.Count)."
+          }
+          foreach ($source in $sourceFiles) {
+            $relative = [IO.Path]::GetRelativePath($sourceRoot, $source.FullName)
+            $published = Join-Path $publishedRoot $relative
+            if (-not (Test-Path $published)) {
+              throw "Frontend file was not staged: $relative"
+            }
+            $sourceHash = (Get-FileHash $source.FullName -Algorithm SHA256).Hash
+            $publishedHash = (Get-FileHash $published -Algorithm SHA256).Hash
+            if ($sourceHash -ne $publishedHash) {
+              throw "Frontend file differs after staging: $relative"
+            }
           }
 
       - name: Create NuGet package
@@ -140,6 +165,26 @@ jobs:
             if ($author -cne 'Mohammed Barqawi') { throw "Unexpected package author: $author" }
             if ($readme -cne 'README.md') { throw "Unexpected package README: $readme" }
             if ($packageType -ne 'AzureSiteExtension') { throw 'AzureSiteExtension package type is missing.' }
+
+            $frontendRoot = (Resolve-Path publish/wwwroot).Path
+            foreach ($frontendFile in Get-ChildItem $frontendRoot -File -Recurse) {
+              $relative = [IO.Path]::GetRelativePath($frontendRoot, $frontendFile.FullName).Replace('\', '/')
+              $entry = $zip.GetEntry("content/wwwroot/$relative")
+              if ($null -eq $entry) { throw "Frontend file is missing from package: $relative" }
+              $stream = $entry.Open()
+              $sha256 = [Security.Cryptography.SHA256]::Create()
+              try {
+                $packageHash = [Convert]::ToHexString($sha256.ComputeHash($stream))
+              }
+              finally {
+                $sha256.Dispose()
+                $stream.Dispose()
+              }
+              $publishedHash = (Get-FileHash $frontendFile.FullName -Algorithm SHA256).Hash
+              if ($packageHash -ne $publishedHash) {
+                throw "Packaged frontend file differs from publish output: $relative"
+              }
+            }
           }
           finally {
             $zip.Dispose()
