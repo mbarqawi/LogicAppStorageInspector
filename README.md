@@ -2,51 +2,53 @@
 
 Logic App Storage Inspector is a Kudu site extension for inspecting the storage used by an Azure Logic App Standard application.
 
-![Logic App Storage Inspector overview](docs/images/overview-placeholder.svg)
+> **Read-only:** The extension only reads Logic App storage data. It does not create, update, or delete workflows, tables, queues, blobs, messages, or other storage data.
 
 ## Functionality
 
-- **History search** — Search action and trigger inputs or outputs by workflow, date, and text. Results can be copied or exported as CSV or JSON.
-- **Flow versions** — Browse workflow versions, view their JSON definitions, and compare two versions side by side.
-- **Storage dashboard** — Review workflow table statistics, queue depths, health indicators, and refresh status.
-- **Site isolation** — Restrict table and queue access to the current Logic App site when a storage account is shared.
-- **Large-storage support** — Use asynchronous, cancellable, and paged operations.
+### Flow history search
 
-![History search, flow versions, and dashboard](docs/images/functionality-placeholder.svg)
+Search action and trigger inputs or outputs by workflow, date, and text. Results can be copied or exported as CSV or JSON.
+
+![Flow history search](docs/images/Search.png)
+
+### Flow versions
+
+Browse workflow versions, view their JSON definitions, and compare two versions side by side.
+
+![Flow version comparison](docs/images/Version.png)
+
+### Information dashboard
+
+Review workflow table information, queue depths, health indicators, and refresh status.
+
+![Information dashboard](docs/images/Dashbord.png)
+
+### Site isolation and performance
+
+- Restricts table and queue access to the current Logic App site when a storage account is shared.
+- Uses asynchronous, cancellable, and paged operations for large storage accounts.
+- Performs no write operations against the Logic App or its storage account.
 
 ## Install from Kudu Site Extensions
 
-### 1. Get the package
-
-Download the `LogicAppStorageInspector-<version>` artifact from the repository's **Actions** page and extract the `.nupkg` file.
-
-Publish the `.nupkg` to a NuGet-compatible feed. For a private feed, add this application setting to the Logic App:
-
-| Setting | Value |
-|---|---|
-| `SCM_SITEEXTENSIONS_FEED_URL` | NuGet v3 feed URL containing the package |
-
-Restart the Logic App after changing the setting.
-
-### 2. Open Kudu
+### 1. Open Kudu
 
 1. Open the Logic App Standard resource in the Azure portal.
 2. Select **Development Tools > Advanced Tools**.
 3. Select **Go** to open the Kudu/SCM site.
 
-![Open the Logic App Kudu site](docs/images/kudu-open-placeholder.svg)
-
-### 3. Install the extension
+### 2. Install the extension
 
 1. In Kudu, select **Site extensions**.
 2. Open the **Gallery** tab.
-3. Search for **LogicAppStorageInspector**.
+3. Search for **Logic App Storage Inspector**.
 4. Select the **+** button and confirm the installation.
 5. Restart the SCM site if Kudu requests it.
 
-![Install LogicAppStorageInspector from the Kudu gallery](docs/images/kudu-install-placeholder.svg)
+![Install Logic App Storage Inspector from the Kudu Gallery](docs/images/How%20to%20add%20the%20extension.png)
 
-### 4. Open the inspector
+### 3. Open the inspector
 
 Use the extension link in Kudu, or browse directly to:
 

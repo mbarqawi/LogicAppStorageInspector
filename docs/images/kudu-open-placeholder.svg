@@ -1,8 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="600" viewBox="0 0 1200 600" role="img" aria-labelledby="title desc">
-  <title id="title">Open Kudu screenshot placeholder</title>
-  <desc id="desc">Replace this placeholder with an Azure portal screenshot showing Advanced Tools and Go.</desc>
-  <rect width="1200" height="600" fill="#f3f4f6"/>
-  <rect x="48" y="48" width="1104" height="504" rx="18" fill="#ffffff" stroke="#2563eb" stroke-width="3" stroke-dasharray="12 10"/>
-  <text x="600" y="275" fill="#111827" font-family="Segoe UI, sans-serif" font-size="38" text-anchor="middle">Kudu Step 1: Advanced Tools</text>
-  <text x="600" y="330" fill="#6b7280" font-family="Segoe UI, sans-serif" font-size="24" text-anchor="middle">Replace with portal screenshot: Development Tools → Advanced Tools → Go</text>
-</svg>
