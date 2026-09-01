@@ -73,14 +73,15 @@ For managed identity, grant the Logic App identity the required Storage Table, Q
 
 ## Build the NuGet package
 
-The [Build NuGet package workflow](.github/workflows/build-nuget.yml) runs on every push to `main`, on pull requests, and on manual dispatch. It:
+The [Build and release NuGet package workflow](.github/workflows/build-nuget.yml) runs on every push to `main`, on pull requests, and on manual dispatch. It:
 
 1. Builds the React frontend.
 2. Publishes a self-contained Windows x64 extension.
 3. Creates and validates the `AzureSiteExtension` NuGet package.
 4. Uploads the `.nupkg` as a workflow artifact.
+5. Creates a GitHub Release with the `.nupkg` when started manually.
 
-For a manual build, open **Actions > Build NuGet package > Run workflow**. An optional package version can be supplied.
+To publish a downloadable release, open **Actions > Build and release NuGet package > Run workflow**, enter a new package version, and run it. Push and pull-request builds create artifacts but do not create releases.
 
 ## Author
 
