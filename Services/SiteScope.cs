@@ -57,9 +57,11 @@ namespace LogicAppStorageInspector.Services
                     throw new InvalidOperationException($"LASI_TABLE_PREFIX '{over}' was not found among tables in this storage account.");
                 }
 
-                var derived = GetRuntimeStoragePrefix();
-                if (tableNames.Any(name => name.StartsWith(derived, StringComparison.OrdinalIgnoreCase)))
-                { Set(derived, "Resolved from the Logic Apps runtime host ID."); return; }
+                foreach (var candidate in GetCandidatePrefixes())
+                {
+                    if (tableNames.Any(name => name.StartsWith(candidate, StringComparison.OrdinalIgnoreCase)))
+                    { Set(candidate, "Resolved from the Logic Apps runtime host ID."); return; }
+                }
 
                 if (!tableNames.Any(name => name.StartsWith("flow", StringComparison.OrdinalIgnoreCase)))
                     throw new InvalidOperationException("No Logic Apps tables (flow<hostId>...) found in this storage account.");
@@ -89,13 +91,27 @@ namespace LogicAppStorageInspector.Services
             return "flow" + hex.Substring(0, 15);
         }
 
-        private string GetRuntimeStoragePrefix()
+        // Host-id source and casing can vary; try every plausible candidate.
+        private IEnumerable<string> GetCandidatePrefixes()
         {
             var hostId = Environment.GetEnvironmentVariable("Microsoft.Azure.Workflows.HostId");
-            if (string.IsNullOrWhiteSpace(hostId)) hostId = SiteName?.ToLowerInvariant();
-            if (string.IsNullOrWhiteSpace(hostId))
-                throw new InvalidOperationException("Neither Microsoft.Azure.Workflows.HostId nor WEBSITE_SITE_NAME is configured.");
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var candidate in new[]
+            {
+                hostId,
+                hostId?.ToLowerInvariant(),
+                SiteName,
+                SiteName?.ToLowerInvariant(),
+            })
+            {
+                if (string.IsNullOrWhiteSpace(candidate)) continue;
+                var prefix = PrefixFor(candidate);
+                if (seen.Add(prefix)) yield return prefix;
+            }
+        }
 
+        private static string PrefixFor(string hostId)
+        {
             var hash = MurmurHash64(Encoding.UTF8.GetBytes(hostId)).ToString("X", CultureInfo.InvariantCulture);
             return "flow" + hash.Substring(0, Math.Min(hash.Length, 15)).ToLowerInvariant();
         }
