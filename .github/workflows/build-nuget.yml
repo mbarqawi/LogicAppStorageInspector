@@ -63,8 +63,19 @@ jobs:
       - name: Build frontend
         shell: pwsh
         run: |
-          npm ci --prefix web
+          $installed = $false
+          foreach ($attempt in 1..3) {
+            Remove-Item web/node_modules -Recurse -Force -ErrorAction SilentlyContinue
+            npm ci --prefix web --prefer-offline --no-audit --no-fund
+            if ($LASTEXITCODE -eq 0) {
+              $installed = $true
+              break
+            }
+            Write-Warning "npm ci attempt $attempt failed."
+          }
+          if (-not $installed) { throw 'npm ci failed after 3 attempts.' }
           npm run build --prefix web
+          if ($LASTEXITCODE -ne 0) { throw 'Frontend build failed.' }
 
       - name: Publish self-contained extension
         shell: pwsh
